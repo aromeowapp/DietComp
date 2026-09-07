@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diario Nutrizionale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,380;0,9..144,560;0,9..144,680;1,9..144,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EFF1EA;
+    --paper-2:#E5E8DC;
+    --ink:#1B211D;
+    --ink-soft:#565F55;
+    --rule:#1B211D;
+    --green:#3F6B4F;
+    --green-soft:#DCE6DD;
+    --ochre:#C68A2E;
+    --ochre-soft:#F3E5C7;
+    --brick:#9C4A38;
+    --brick-soft:#EBD9D2;
+    --teal:#2E6B6B;
+    --teal-soft:#D9E6E4;
+    --max:720px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  .wrap{max-width:var(--max); margin:0 auto; padding:22px 18px 0;}
+  a{color:inherit;}
+
+  /* ---- Header ---- */
+  header.top{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    padding-bottom:16px; margin-bottom:18px;
+    border-bottom:3px solid var(--rule);
+  }
+  header.top h1{
+    font-family:'Fraunces', serif; font-weight:680; font-style:italic;
+    font-size:28px; margin:0; letter-spacing:-0.01em;
+  }
+  header.top p{margin:2px 0 0; font-size:12.5px; color:var(--ink-soft);}
+  .weight-field{text-align:right; flex-shrink:0;}
+  .weight-field label{display:block; font-size:11px; color:var(--ink-soft); margin-bottom:3px;}
+  .weight-field .inline{display:flex; align-items:baseline; gap:5px; justify-content:flex-end;}
+  .weight-field input{
+    width:56px; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600;
+    text-align:right; border:none; border-bottom:2px solid var(--rule); background:transparent;
+    color:var(--ink); padding:0 0 1px;
+  }
+  .weight-field input:focus{outline:none; border-bottom-color:var(--green);}
+  .weight-field .unit{font-size:13px; color:var(--ink-soft);}
+
+  /* ---- Section titles ---- */
+  .section-label{
+    font-size:11px; letter-spacing:0.02em; color:var(--ink-soft);
+    margin:34px 0 10px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{content:""; flex:1; height:1px; background:var(--ink-soft); opacity:0.35;}
+
+  /* ---- Nutrition facts hero panel ---- */
+  .facts{
+    border:3px solid var(--rule); padding:16px 18px 14px; background:#fff;
+  }
+  .facts .facts-title{font-size:13px; letter-spacing:0.02em; margin:0 0 6px;}
+  .facts .rule-thick{border:none; border-top:8px solid var(--rule); margin:8px 0;}
+  .facts .rule-med{border:none; border-top:4px solid var(--rule); margin:8px 0;}
+  .facts .rule-thin{border:none; border-top:1px solid var(--rule); opacity:0.5; margin:9px 0;}
+  .kcal-row{display:flex; align-items:baseline; justify-content:space-between;}
+  .kcal-row .num{
+    font-family:'Fraunces', serif; font-weight:680; font-size:52px; line-height:1;
+    font-variant-numeric:tabular-nums;
+  }
+  .kcal-row .lbl{font-size:12px; color:var(--ink-soft); text-align:right; max-width:110px;}
+  .macro-row{display:flex; align-items:center; gap:10px; padding:7px 0;}
+  .macro-row .dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .macro-row .name{width:96px; flex-shrink:0; font-size:13.5px;}
+  .macro-row .bar-track{flex:1; height:7px; background:var(--paper-2); position:relative; overflow:hidden;}
+  .macro-row .bar-fill{position:absolute; left:0; top:0; bottom:0;}
+  .macro-row .val{width:96px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600; font-size:13.5px; flex-shrink:0;}
+  .macro-row .pct{width:40px; text-align:right; color:var(--ink-soft); font-size:12px; flex-shrink:0;}
+  .sub-stats{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:var(--ink-soft); padding-top:2px; flex-wrap:wrap;}
+  .sub-stats b{color:var(--ink); font-weight:600;}
+  .checksum{font-size:11.5px; color:var(--ink-soft); margin-top:8px;}
+
+  /* ---- Converter ---- */
+  .converter{border:1px solid var(--rule); padding:14px 16px;}
+  .converter h2{font-family:'Fraunces',serif; font-weight:560; font-size:16px; margin:0 0 10px;}
+  .conv-grid{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
+  select, input[type=number], input[type=text]{
+    font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--ink);
+    border:1px solid var(--rule); background:#fff; padding:8px 9px;
+  }
+  select:focus, input:focus{outline:2px solid var(--green); outline-offset:1px;}
+  .converter select{flex:1 1 200px; min-width:150px;}
+  .toggle-pill{display:inline-flex; border:1px solid var(--rule); overflow:hidden; flex-shrink:0;}
+  .toggle-pill button{
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px; padding:8px 10px; border:none; background:#fff; color:var(--ink); cursor:pointer;
+  }
+  .toggle-pill button.active{background:var(--ink); color:var(--paper);}
+  .conv-input{width:90px; flex-shrink:0;}
+  .conv-result{
+    width:100%; margin-top:10px; padding-top:10px; border-top:1px dashed var(--ink-soft);
+    font-size:14px;
+  }
+  .conv-result .big{font-family:'Fraunces',serif; font-weight:600; font-size:22px; font-variant-numeric:tabular-nums;}
+  .conv-result .macros{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+
+  /* ---- Food rows ---- */
+  .rows{border-top:3px solid var(--rule);}
+  .food-row{border-bottom:1px solid var(--rule); padding:13px 0;}
+  .food-row .row-top{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .food-row select.food-select{flex:1 1 170px; min-width:140px;}
+  .field{display:flex; flex-direction:column; gap:2px;}
+  .field label{font-size:10px; color:var(--ink-soft);}
+  .field input{width:76px;}
+  .row-actions{display:flex; gap:4px; margin-left:auto;}
+  .icon-btn{
+    border:1px solid var(--rule); background:#fff; width:30px; height:30px; cursor:pointer;
+    font-size:14px; color:var(--ink); display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:hover{background:var(--paper-2);}
+  .hint{font-size:11.5px; color:var(--green); margin-top:5px;}
+  .hint button{
+    border:none; background:none; text-decoration:underline; cursor:pointer; font-family:inherit;
+    font-size:11.5px; color:var(--green); padding:0; margin-left:4px;
+  }
+  .row-results{
+    display:flex; flex-wrap:wrap; gap:14px; margin-top:9px; font-size:12.5px;
+    font-variant-numeric:tabular-nums;
+  }
+  .row-results .r-item b{display:block; font-size:14px;}
+  .row-results .r-item span{color:var(--ink-soft); font-size:10.5px;}
+  .micro-toggle{font-size:11px; color:var(--ink-soft); background:none; border:none; cursor:pointer; text-decoration:underline; padding:0; margin-top:8px; font-family:inherit;}
+  .micro-table{display:none; margin-top:8px; border-top:1px dotted var(--ink-soft); padding-top:8px;}
+  .micro-table.open{display:grid; grid-template-columns:repeat(auto-fill,minmax(105px,1fr)); gap:8px;}
+  .micro-table div span{display:block; font-size:10px; color:var(--ink-soft);}
+  .micro-table div b{font-size:12.5px; font-variant-numeric:tabular-nums;}
+
+  .add-row{
+    width:100%; margin-top:14px; padding:11px; border:1px dashed var(--rule); background:none;
+    font-family:'Space Grotesk',sans-serif; font-size:13.5px; color:var(--ink); cursor:pointer;
+  }
+  .add-row:hover{background:#fff;}
+
+  /* ---- Micronutrient totals ---- */
+  details.micro-summary{border:1px solid var(--rule); padding:12px 16px;}
+  details.micro-summary summary{
+    cursor:pointer; font-family:'Fraunces',serif; font-weight:560; font-size:15px; list-style:none;
+  }
+  details.micro-summary summary::-webkit-details-marker{display:none;}
+  details.micro-summary summary::before{content:"▸ "; font-family:'Space Grotesk',sans-serif;}
+  details.micro-summary[open] summary::before{content:"▾ ";}
+  .micro-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; margin-top:14px;}
+  .micro-grid div{border-top:1px solid var(--ink-soft); padding-top:5px;}
+  .micro-grid div span{display:block; font-size:10.5px; color:var(--ink-soft);}
+  .micro-grid div b{font-size:15px; font-variant-numeric:tabular-nums;}
+
+  footer{max-width:var(--max); margin:26px auto 0; padding:0 18px; font-size:11px; color:var(--ink-soft);}
+
+  @media (max-width:420px){
+    .kcal-row .num{font-size:42px;}
+    .field input{width:64px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Diario Nutrizionale</h1>
+      <p>Calcolo di macro e micronutrienti per pasto</p>
+    </div>
+    <div class="weight-field">
+      <label for="bodyWeight">peso corporeo</label>
+      <div class="inline">
+        <input type="number" id="bodyWeight" min="0" step="0.1" value="85">
+        <span class="unit">kg</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="facts">
+    <p class="facts-title">TOTALE GIORNALIERO</p>
+    <hr class="rule-thick">
+    <div class="kcal-row">
+      <div class="num" id="totKcal">0</div>
+      <div class="lbl">kcal da <span id="rowCount">0</span> alimenti</div>
+    </div>
+    <hr class="rule-med">
+
+    <div class="macro-row">
+      <span class="dot" style="background:var(--green)"></span>
+      <span class="name">Proteine</span>
+      <span class="bar-track"><span class="bar-fill" id="barProt" style="background:var(--green)"></span></span>
+      <span class="pct" id="pctProt">0%</span>
+      <span class="val" id="valProt">0 g</span>
+    </div>
+    <div class="macro-row">
+      <span class="dot" style="background:var(--ochre)"></span>
+      <span class="name">Carboidrati</span>
+      <span class="bar-track"><span class="bar-fill" id="barCarb" style="background:var(--ochre)"></span></span>
+      <span class="pct" id="pctCarb">0%</span>
+      <span class="val" id="valCarb">0 g</span>
+    </div>
+    <div class="macro-row">
+      <span class="dot" style="background:var(--brick)"></span>
+      <span class="name">Grassi</span>
+      <span class="bar-track"><span class="bar-fill" id="barFat" style="background:var(--brick)"></span></span>
+      <span class="pct" id="pctFat">0%</span>
+      <span class="val" id="valFat">0 g</span>
+    </div>
+    <div class="macro-row">
+      <span class="dot" style="background:var(--teal)"></span>
+      <span class="name">Fibre</span>
+      <span class="bar-track"><span class="bar-fill" id="barFib" style="background:var(--teal); opacity:.0"></span></span>
+      <span class="pct"></span>
+      <span class="val" id="valFib">0 g</span>
+    </div>
+
+    <hr class="rule-thin">
+    <div class="sub-stats">
+      <div>proteine/kg corporeo &nbsp;<b id="protPerKg">0.00</b> g/kg</div>
+      <div>kcal dai macronutrienti &nbsp;<b id="kcalFromMacro">0</b></div>
+    </div>
+    <div class="checksum" id="checksum"></div>
+  </section>
+
+  <p class="section-label">CONVERSIONE RAPIDA</p>
+  <div class="converter">
+    <h2>Da grammi a kcal (e viceversa)</h2>
+    <div class="conv-grid">
+      <select id="convFood"></select>
+      <div class="toggle-pill">
+        <button type="button" id="convModeG2K" class="active">g → kcal</button>
+        <button type="button" id="convModeK2G">kcal → g</button>
+      </div>
+      <input type="number" id="convInput" class="conv-input" placeholder="0" min="0">
+    </div>
+    <div class="conv-result" id="convResult"></div>
+  </div>
+
+  <p class="section-label">ALIMENTI DI OGGI</p>
+  <div class="rows" id="rows"></div>
+  <button class="add-row" id="addRow" type="button">+ Aggiungi alimento</button>
+
+  <p class="section-label">MICRONUTRIENTI</p>
+  <details class="micro-summary">
+    <summary>Dettaglio totale giornaliero</summary>
+    <div class="micro-grid" id="microGrid"></div>
+  </details>
+
+  <footer>
+    I dati nutrizionali provengono da <code>data.json</code>. Le voci si salvano automaticamente in questo browser.
+    <br><button id="resetAll" style="border:none;background:none;text-decoration:underline;cursor:pointer;font-family:inherit;padding:4px 0;color:inherit;">Azzera tutto</button>
+  </footer>
+</div>
+
+<script>
+const NUTRIENTS = [
+  {key:'calcio', label:'Calcio', unit:'mg'},
+  {key:'ferro', label:'Ferro', unit:'mg'},
+  {key:'magnesio', label:'Magnesio', unit:'mg'},
+  {key:'fosforo', label:'Fosforo', unit:'mg'},
+  {key:'potassio', label:'Potassio', unit:'mg'},
+  {key:'sodio', label:'Sodio', unit:'mg'},
+  {key:'zinco', label:'Zinco', unit:'mg'},
+  {key:'vitB12', label:'Vit. B12', unit:'mcg'},
+  {key:'vitC', label:'Vit. C', unit:'mg'},
+  {key:'vitD', label:'Vit. D', unit:'µg'},
+  {key:'vitA', label:'Vit. A', unit:'µg'},
+];
+
+let FOODS = [];
+let foodByName = {};
+let state = {bodyWeight: 85, rows: []};
+
+const STORAGE_KEY = 'dietaApp.v1';
+
+function fmt(n, d=1){
+  if(!isFinite(n)) return '0';
+  return n.toLocaleString('it-IT', {minimumFractionDigits:0, maximumFractionDigits:d});
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && Array.isArray(parsed.rows)) return parsed;
+    }
+  }catch(e){}
+  return null;
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function uid(){ return 'r'+Math.random().toString(36).slice(2,9); }
+
+function defaultRow(foodName){
+  return {id: uid(), food: foodName, grams: 100, kcalDesired: ''};
+}
+
+async function init(){
+  const res = await fetch('data.json');
+  FOODS = await res.json();
+  FOODS.forEach(f => foodByName[f.nome] = f);
+
+  const saved = loadState();
+  if(saved){
+    state = saved;
+  } else {
+    state.rows = [
+      defaultRow(FOODS[0].nome),
+      defaultRow(FOODS[12] ? FOODS[12].nome : FOODS[0].nome),
+    ];
+  }
+
+  document.getElementById('bodyWeight').value = state.bodyWeight;
+  buildFoodOptions();
+  render();
+
+  document.getElementById('bodyWeight').addEventListener('input', e=>{
+    state.bodyWeight = parseFloat(e.target.value) || 0;
+    saveState(); render();
+  });
+  document.getElementById('addRow').addEventListener('click', ()=>{
+    state.rows.push(defaultRow(FOODS[0].nome));
+    saveState(); render();
+  });
+  document.getElementById('resetAll').addEventListener('click', ()=>{
+    if(confirm('Cancellare tutti gli alimenti inseriti?')){
+      state.rows = [];
+      saveState(); render();
+    }
+  });
+
+  setupConverter();
+}
+
+function optionsHtml(selected){
+  return FOODS.map(f => `<option value="${f.nome}" ${f.nome===selected?'selected':''}>${f.nome}</option>`).join('');
+}
+
+function buildFoodOptions(){
+  document.getElementById('convFood').innerHTML = optionsHtml(FOODS[0].nome);
+}
+
+function computeRow(row){
+  const food = foodByName[row.food] || FOODS[0];
+  const grams = parseFloat(row.grams) || 0;
+  const factor = grams/100;
+  const out = {kcal: factor*food.kcal, proteine: factor*food.proteine, carbo: factor*food.carbo, grassi: factor*food.grassi, fibre: factor*food.fibre};
+  NUTRIENTS.forEach(n => out[n.key] = factor*(food[n.key]||0));
+
+  let suggestion = null;
+  const kd = parseFloat(row.kcalDesired);
+  if(kd > 0 && food.kcal > 0){
+    const suggestedGrams = kd/food.kcal*100;
+    suggestion = {
+      grams: suggestedGrams,
+      proteine: suggestedGrams/100*food.proteine
+    };
+  }
+  return {food, out, suggestion};
+}
+
+function render(){
+  renderRows();
+  renderTotals();
+}
+
+function renderRows(){
+  const container = document.getElementById('rows');
+  container.innerHTML = '';
+  document.getElementById('rowCount').textContent = state.rows.length;
+
+  state.rows.forEach(row => {
+    const {food, out, suggestion} = computeRow(row);
+    const el = document.createElement('div');
+    el.className = 'food-row';
+    el.innerHTML = `
+      <div class="row-top">
+        <select class="food-select" data-id="${row.id}" data-field="food">${optionsHtml(row.food)}</select>
+        <div class="field">
+          <label>grammi</label>
+          <input type="number" min="0" step="1" value="${row.grams}" data-id="${row.id}" data-field="grams">
+        </div>
+        <div class="field">
+          <label>kcal desiderate</label>
+          <input type="number" min="0" step="1" placeholder="—" value="${row.kcalDesired}" data-id="${row.id}" data-field="kcalDesired">
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" data-id="${row.id}" data-action="remove" title="Elimina">✕</button>
+        </div>
+      </div>
+      ${suggestion ? `<div class="hint">→ ${fmt(suggestion.grams)} g suggeriti per raggiungere le kcal desiderate (proteine: ${fmt(suggestion.proteine)} g)
+        <button data-id="${row.id}" data-action="applySuggestion" data-grams="${suggestion.grams.toFixed(1)}">usa questo valore</button></div>` : ''}
+      <div class="row-results">
+        <div class="r-item"><b>${fmt(out.kcal,0)}</b><span>kcal</span></div>
+        <div class="r-item"><b>${fmt(out.proteine)}</b><span>proteine g</span></div>
+        <div class="r-item"><b>${fmt(out.carbo)}</b><span>carbo g</span></div>
+        <div class="r-item"><b>${fmt(out.grassi)}</b><span>grassi g</span></div>
+        <div class="r-item"><b>${fmt(out.fibre)}</b><span>fibre g</span></div>
+      </div>
+      <button class="micro-toggle" data-action="toggleMicro" data-id="${row.id}">micronutrienti</button>
+      <div class="micro-table" id="micro-${row.id}">
+        ${NUTRIENTS.map(n => `<div><span>${n.label}</span><b>${fmt(out[n.key], n.key==='vitB12'?2:1)} ${n.unit}</b></div>`).join('')}
+      </div>
+    `;
+    container.appendChild(el);
+  });
+
+  container.querySelectorAll('[data-field]').forEach(input => {
+    input.addEventListener('input', onFieldChange);
+    input.addEventListener('change', onFieldChange);
+  });
+  container.querySelectorAll('[data-action="remove"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.rows = state.rows.filter(r => r.id !== btn.dataset.id);
+      saveState(); render();
+    });
+  });
+  container.querySelectorAll('[data-action="toggleMicro"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('micro-'+btn.dataset.id).classList.toggle('open');
+    });
+  });
+  container.querySelectorAll('[data-action="applySuggestion"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = state.rows.find(r => r.id === btn.dataset.id);
+      row.grams = Math.round(parseFloat(btn.dataset.grams));
+      saveState(); render();
+    });
+  });
+}
+
+function onFieldChange(e){
+  const id = e.target.dataset.id;
+  const field = e.target.dataset.field;
+  const row = state.rows.find(r => r.id === id);
+  if(!row) return;
+  row[field] = e.target.value;
+  saveState();
+  renderRows();
+  renderTotals();
+}
+
+function renderTotals(){
+  const totals = {kcal:0, proteine:0, carbo:0, grassi:0, fibre:0};
+  NUTRIENTS.forEach(n => totals[n.key] = 0);
+
+  state.rows.forEach(row => {
+    const {out} = computeRow(row);
+    totals.kcal += out.kcal;
+    totals.proteine += out.proteine;
+    totals.carbo += out.carbo;
+    totals.grassi += out.grassi;
+    totals.fibre += out.fibre;
+    NUTRIENTS.forEach(n => totals[n.key] += out[n.key]);
+  });
+
+  document.getElementById('totKcal').textContent = fmt(totals.kcal, 0);
+  document.getElementById('valProt').textContent = fmt(totals.proteine)+' g';
+  document.getElementById('valCarb').textContent = fmt(totals.carbo)+' g';
+  document.getElementById('valFat').textContent = fmt(totals.grassi)+' g';
+  document.getElementById('valFib').textContent = fmt(totals.fibre)+' g';
+
+  const kcalP = totals.proteine*4, kcalC = totals.carbo*4, kcalF = totals.grassi*9;
+  const kcalFromMacro = kcalP+kcalC+kcalF;
+  const base = totals.kcal || 1;
+  document.getElementById('pctProt').textContent = fmt(kcalP/base*100,0)+'%';
+  document.getElementById('pctCarb').textContent = fmt(kcalC/base*100,0)+'%';
+  document.getElementById('pctFat').textContent = fmt(kcalF/base*100,0)+'%';
+  document.getElementById('barProt').style.width = Math.min(100, kcalP/base*100)+'%';
+  document.getElementById('barCarb').style.width = Math.min(100, kcalC/base*100)+'%';
+  document.getElementById('barFat').style.width = Math.min(100, kcalF/base*100)+'%';
+
+  const bw = parseFloat(state.bodyWeight) || 0;
+  document.getElementById('protPerKg').textContent = bw>0 ? fmt(totals.proteine/bw, 2) : '—';
+  document.getElementById('kcalFromMacro').textContent = fmt(kcalFromMacro,0);
+
+  const delta = kcalFromMacro - totals.kcal;
+  document.getElementById('checksum').textContent =
+    `differenza tra kcal dichiarate e kcal ricalcolate dai macro: ${delta>=0?'+':''}${fmt(delta,0)} kcal`;
+
+  const grid = document.getElementById('microGrid');
+  grid.innerHTML = NUTRIENTS.map(n => `<div><span>${n.label}</span><b>${fmt(totals[n.key], n.key==='vitB12'?2:1)} ${n.unit}</b></div>`).join('');
+}
+
+function setupConverter(){
+  let mode = 'g2k';
+  const btnG2K = document.getElementById('convModeG2K');
+  const btnK2G = document.getElementById('convModeK2G');
+  const input = document.getElementById('convInput');
+  const foodSel = document.getElementById('convFood');
+
+  function setMode(m){
+    mode = m;
+    btnG2K.classList.toggle('active', m==='g2k');
+    btnK2G.classList.toggle('active', m==='k2g');
+    input.placeholder = m==='g2k' ? 'grammi' : 'kcal';
+    computeConverter();
+  }
+  btnG2K.addEventListener('click', ()=>setMode('g2k'));
+  btnK2G.addEventListener('click', ()=>setMode('k2g'));
+  input.addEventListener('input', computeConverter);
+  foodSel.addEventListener('change', computeConverter);
+
+  function computeConverter(){
+    const food = foodByName[foodSel.value] || FOODS[0];
+    const v = parseFloat(input.value) || 0;
+    const result = document.getElementById('convResult');
+    if(v <= 0){ result.innerHTML = ''; return; }
+
+    let grams, kcal;
+    if(mode === 'g2k'){
+      grams = v; kcal = v/100*food.kcal;
+    } else {
+      kcal = v; grams = food.kcal>0 ? v/food.kcal*100 : 0;
+    }
+    const factor = grams/100;
+    result.innerHTML = `
+      <div class="big">${mode==='g2k' ? fmt(kcal,0)+' kcal' : fmt(grams,0)+' g'}</div>
+      <div class="macros">${food.nome} · ${fmt(grams,0)} g → proteine ${fmt(factor*food.proteine)} g · carbo ${fmt(factor*food.carbo)} g · grassi ${fmt(factor*food.grassi)} g · fibre ${fmt(factor*food.fibre)} g</div>
+    `;
+  }
+  setMode('g2k');
+}
+
+init();
+</script>
+</body>
+</html>

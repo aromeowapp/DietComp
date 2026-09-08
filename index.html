@@ -201,6 +201,11 @@
     </div>
   </header>
 
+  <div class="patient-field" style="margin:-4px 0 18px;">
+    <label for="patientName" style="display:block; font-size:11px; color:var(--ink-soft); margin-bottom:4px;">nome paziente</label>
+    <input type="text" id="patientName" placeholder="—" style="width:100%; font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; border:none; border-bottom:2px solid var(--rule); background:transparent; color:var(--ink); padding:2px 0 4px;">
+  </div>
+
   <section class="facts">
     <p class="facts-title">TOTALE GIORNALIERO</p>
     <hr class="rule-thick">
@@ -353,7 +358,7 @@ const MEALS = ['Colazione','Spuntino (Mattino)','Pranzo','Merenda (Pomeriggio)',
 
 let FOODS = [];
 let foodByName = {};
-let state = {bodyWeight: 85, rows: [], notes: ''};
+let state = {bodyWeight: 85, patientName: '', rows: [], notes: ''};
 
 const STORAGE_KEY = 'dietaApp.v1';
 
@@ -399,6 +404,7 @@ async function init(){
   }
 
   document.getElementById('bodyWeight').value = state.bodyWeight;
+  document.getElementById('patientName').value = state.patientName || '';
   document.getElementById('notesInput').value = state.notes || '';
   buildFoodOptions();
   render();
@@ -406,6 +412,10 @@ async function init(){
   document.getElementById('bodyWeight').addEventListener('input', e=>{
     state.bodyWeight = parseFloat(e.target.value) || 0;
     saveState(); render();
+  });
+  document.getElementById('patientName').addEventListener('input', e=>{
+    state.patientName = e.target.value;
+    saveState();
   });
   document.getElementById('notesInput').addEventListener('input', e=>{
     state.notes = e.target.value;
@@ -468,9 +478,12 @@ function buildExportData(){
   }));
 
   const dataStr = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long', year:'numeric'});
+  const patientName = (state.patientName || '').trim();
+  const docTitle = patientName ? `Dieta - ${patientName}` : 'Dieta';
 
   return {
     dataStr, bw, groups, micro,
+    patientName, docTitle,
     notes: (state.notes || '').trim(),
     totKcal: fmt(totals.kcal, 0),
     totProt: fmt(totals.proteine), totCarb: fmt(totals.carbo), totFat: fmt(totals.grassi), totFib: fmt(totals.fibre),
@@ -499,7 +512,7 @@ async function exportToPdf(){
     let y = margin;
 
     doc.setFont('helvetica','bold'); doc.setFontSize(18);
-    doc.text('Diario Nutrizionale', margin, y); y += 20;
+    doc.text(d.docTitle, margin, y); y += 20;
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
     doc.text(`Data: ${d.dataStr}     Peso corporeo: ${fmt(d.bw,1)} kg`, margin, y); y += 22;
 
@@ -635,7 +648,7 @@ function exportToWord(){
   .totals p{ margin:3px 0; font-size:10.5pt; }
 </style></head>
 <body>
-  <h1>Diario Nutrizionale</h1>
+  <h1>${escapeHtml(d.docTitle)}</h1>
   <p class="sub">Data: ${d.dataStr} &nbsp;&nbsp; Peso corporeo: ${fmt(d.bw,1)} kg</p>
 
   <div class="totals">

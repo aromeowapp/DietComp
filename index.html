@@ -152,6 +152,16 @@
   }
   .add-row:hover{background:#fff;}
 
+  /* ---- Export bar ---- */
+  .export-bar{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  .export-btn{
+    flex:1 1 150px; padding:11px 12px; border:1px solid var(--rule); background:var(--ink);
+    color:var(--paper); font-family:'Space Grotesk',sans-serif; font-size:13.5px; font-weight:500;
+    cursor:pointer; letter-spacing:0.01em;
+  }
+  .export-btn:hover{background:var(--green);}
+  .export-btn:disabled{opacity:0.5; cursor:wait;}
+
   /* ---- Micronutrient totals ---- */
   details.micro-summary{border:1px solid var(--rule); padding:12px 16px;}
   details.micro-summary summary{
@@ -236,6 +246,11 @@
     <div class="checksum" id="checksum"></div>
   </section>
 
+  <div class="export-bar">
+    <button type="button" class="export-btn" id="exportPdf">↓ Esporta PDF</button>
+    <button type="button" class="export-btn" id="exportWord">↓ Esporta Word</button>
+  </div>
+
   <p class="section-label">CONVERSIONE RAPIDA</p>
   <div class="converter">
     <h2>Da grammi a kcal (e viceversa)</h2>
@@ -266,6 +281,8 @@
   </footer>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <script>
 const NUTRIENTS = [
   {key:'calcio', label:'Calcio', unit:'mg'},
@@ -347,7 +364,175 @@ async function init(){
     }
   });
 
+  document.getElementById('exportPdf').addEventListener('click', exportToPdf);
+  document.getElementById('exportWord').addEventListener('click', exportToWord);
+
   setupConverter();
+}
+
+/* ---------------------------------------------------------
+   ESPORTAZIONE DIETA (PDF / Word)
+--------------------------------------------------------- */
+
+function buildExportData(){
+  const totals = getTotals();
+  const bw = parseFloat(state.bodyWeight) || 0;
+  const kcalP = totals.proteine*4, kcalC = totals.carbo*4, kcalF = totals.grassi*9;
+  const base = totals.kcal || 1;
+
+  const rows = state.rows.map(row => {
+    const {food, out} = computeRow(row);
+    return {
+      nome: food.nome,
+      grammi: fmt(parseFloat(row.grams) || 0, 0),
+      kcal: fmt(out.kcal, 0),
+      proteine: fmt(out.proteine),
+      carbo: fmt(out.carbo),
+      grassi: fmt(out.grassi),
+      fibre: fmt(out.fibre)
+    };
+  });
+
+  const micro = NUTRIENTS.map(n => ({
+    label: n.label,
+    value: fmt(totals[n.key], n.key==='vitB12'?2:1) + ' ' + n.unit
+  }));
+
+  const dataStr = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long', year:'numeric'});
+
+  return {
+    dataStr, bw, rows, micro,
+    totKcal: fmt(totals.kcal, 0),
+    totProt: fmt(totals.proteine), totCarb: fmt(totals.carbo), totFat: fmt(totals.grassi), totFib: fmt(totals.fibre),
+    pctProt: fmt(kcalP/base*100, 0), pctCarb: fmt(kcalC/base*100, 0), pctFat: fmt(kcalF/base*100, 0),
+    protPerKg: bw>0 ? fmt(totals.proteine/bw, 2) : '—'
+  };
+}
+
+function exportToPdf(){
+  const btn = document.getElementById('exportPdf');
+  if(!window.jspdf){ alert('Libreria PDF non ancora caricata, riprova tra un istante.'); return; }
+  btn.disabled = true;
+  try{
+    const d = buildExportData();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'pt', format:'a4'});
+    const margin = 40;
+    let y = margin;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(18);
+    doc.text('Diario Nutrizionale', margin, y); y += 20;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(`Data: ${d.dataStr}     Peso corporeo: ${fmt(d.bw,1)} kg`, margin, y); y += 22;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text(`Totale giornaliero: ${d.totKcal} kcal`, margin, y); y += 18;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(`Proteine ${d.totProt} g (${d.pctProt}%)   Carboidrati ${d.totCarb} g (${d.pctCarb}%)   Grassi ${d.totFat} g (${d.pctFat}%)   Fibre ${d.totFib} g`, margin, y); y += 14;
+    doc.text(`Proteine/kg corporeo: ${d.protPerKg} g/kg`, margin, y); y += 10;
+
+    doc.autoTable({
+      startY: y + 10,
+      head: [['Alimento','g','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
+      body: d.rows.map(r => [r.nome, r.grammi, r.kcal, r.proteine, r.carbo, r.grassi, r.fibre]),
+      foot: [['Totale','', d.totKcal, d.totProt, d.totCarb, d.totFat, d.totFib]],
+      styles:{ font:'helvetica', fontSize:9, cellPadding:4 },
+      headStyles:{ fillColor:[27,33,29] },
+      footStyles:{ fillColor:[220,230,221], textColor:[27,33,29], fontStyle:'bold' },
+      margin:{ left: margin, right: margin }
+    });
+
+    let y2 = doc.lastAutoTable.finalY + 24;
+    if(y2 > 720){ doc.addPage(); y2 = margin; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Micronutrienti - totale giornaliero', margin, y2); y2 += 6;
+
+    doc.autoTable({
+      startY: y2 + 6,
+      body: (() => {
+        const pairs = d.micro.map(m => [m.label, m.value]);
+        const table = [];
+        for(let i=0;i<pairs.length;i+=2){
+          table.push([...pairs[i], ...(pairs[i+1]||['',''])]);
+        }
+        return table;
+      })(),
+      styles:{ font:'helvetica', fontSize:9, cellPadding:4 },
+      theme:'grid',
+      margin:{ left: margin, right: margin }
+    });
+
+    doc.save(`dieta_${new Date().toISOString().slice(0,10)}.pdf`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function exportToWord(){
+  const btn = document.getElementById('exportWord');
+  btn.disabled = true;
+  try{
+    const d = buildExportData();
+
+    const rowsHtml = d.rows.map(r => `
+      <tr>
+        <td>${r.nome}</td><td align="right">${r.grammi}</td><td align="right">${r.kcal}</td>
+        <td align="right">${r.proteine}</td><td align="right">${r.carbo}</td>
+        <td align="right">${r.grassi}</td><td align="right">${r.fibre}</td>
+      </tr>`).join('');
+
+    const microHtml = d.micro.map(m => `<tr><td>${m.label}</td><td align="right">${m.value}</td></tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{ font-family: Calibri, Arial, sans-serif; font-size:11pt; color:#1B211D; }
+  h1{ font-size:20pt; margin-bottom:0; }
+  .sub{ color:#565F55; font-size:10pt; margin-top:2px; }
+  table{ border-collapse: collapse; width:100%; margin-top:14px; }
+  th, td{ border:1px solid #1B211D; padding:5px 8px; font-size:10pt; }
+  th{ background:#1B211D; color:#EFF1EA; text-align:left; }
+  tfoot td{ background:#DCE6DD; font-weight:bold; }
+  h2{ font-size:13pt; margin-top:26px; }
+  .totals p{ margin:3px 0; font-size:10.5pt; }
+</style></head>
+<body>
+  <h1>Diario Nutrizionale</h1>
+  <p class="sub">Data: ${d.dataStr} &nbsp;&nbsp; Peso corporeo: ${fmt(d.bw,1)} kg</p>
+
+  <div class="totals">
+    <p><b>Totale giornaliero: ${d.totKcal} kcal</b></p>
+    <p>Proteine ${d.totProt} g (${d.pctProt}%) &nbsp; Carboidrati ${d.totCarb} g (${d.pctCarb}%) &nbsp; Grassi ${d.totFat} g (${d.pctFat}%) &nbsp; Fibre ${d.totFib} g</p>
+    <p>Proteine/kg corporeo: ${d.protPerKg} g/kg</p>
+  </div>
+
+  <h2>Alimenti</h2>
+  <table>
+    <thead><tr><th>Alimento</th><th>g</th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot><tr><td>Totale</td><td></td><td>${d.totKcal}</td><td>${d.totProt}</td><td>${d.totCarb}</td><td>${d.totFat}</td><td>${d.totFib}</td></tr></tfoot>
+  </table>
+
+  <h2>Micronutrienti - totale giornaliero</h2>
+  <table>
+    <tbody>${microHtml}</tbody>
+  </table>
+</body>
+</html>`;
+
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dieta_${new Date().toISOString().slice(0,10)}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function optionsHtml(selected){
@@ -458,7 +643,7 @@ function onFieldChange(e){
   renderTotals();
 }
 
-function renderTotals(){
+function getTotals(){
   const totals = {kcal:0, proteine:0, carbo:0, grassi:0, fibre:0};
   NUTRIENTS.forEach(n => totals[n.key] = 0);
 
@@ -471,6 +656,11 @@ function renderTotals(){
     totals.fibre += out.fibre;
     NUTRIENTS.forEach(n => totals[n.key] += out[n.key]);
   });
+  return totals;
+}
+
+function renderTotals(){
+  const totals = getTotals();
 
   document.getElementById('totKcal').textContent = fmt(totals.kcal, 0);
   document.getElementById('valProt').textContent = fmt(totals.proteine)+' g';

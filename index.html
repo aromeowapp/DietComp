@@ -438,19 +438,29 @@ function buildExportData(){
   const kcalP = totals.proteine*4, kcalC = totals.carbo*4, kcalF = totals.grassi*9;
   const base = totals.kcal || 1;
 
-  const rows = state.rows.map(row => {
-    const {food, out} = computeRow(row);
+  const groups = MEALS.map(meal => {
+    const mealRows = state.rows.filter(row => (row.pasto || MEALS[0]) === meal);
+    const sub = {kcal:0, proteine:0, carbo:0, grassi:0, fibre:0};
+    const rowsOut = mealRows.map(row => {
+      const {food, out} = computeRow(row);
+      sub.kcal += out.kcal; sub.proteine += out.proteine; sub.carbo += out.carbo;
+      sub.grassi += out.grassi; sub.fibre += out.fibre;
+      return {
+        nome: food.nome,
+        grammi: fmt(parseFloat(row.grams) || 0, 0),
+        kcal: fmt(out.kcal, 0),
+        proteine: fmt(out.proteine),
+        carbo: fmt(out.carbo),
+        grassi: fmt(out.grassi),
+        fibre: fmt(out.fibre)
+      };
+    });
     return {
-      nome: food.nome,
-      pasto: row.pasto || MEALS[0],
-      grammi: fmt(parseFloat(row.grams) || 0, 0),
-      kcal: fmt(out.kcal, 0),
-      proteine: fmt(out.proteine),
-      carbo: fmt(out.carbo),
-      grassi: fmt(out.grassi),
-      fibre: fmt(out.fibre)
+      meal, rows: rowsOut,
+      subKcal: fmt(sub.kcal, 0), subProt: fmt(sub.proteine), subCarb: fmt(sub.carbo),
+      subFat: fmt(sub.grassi), subFib: fmt(sub.fibre)
     };
-  });
+  }).filter(g => g.rows.length > 0);
 
   const micro = NUTRIENTS.map(n => ({
     label: n.label,
@@ -460,7 +470,7 @@ function buildExportData(){
   const dataStr = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long', year:'numeric'});
 
   return {
-    dataStr, bw, rows, micro,
+    dataStr, bw, groups, micro,
     notes: (state.notes || '').trim(),
     totKcal: fmt(totals.kcal, 0),
     totProt: fmt(totals.proteine), totCarb: fmt(totals.carbo), totFat: fmt(totals.grassi), totFib: fmt(totals.fibre),
@@ -497,21 +507,44 @@ async function exportToPdf(){
     doc.text(`Totale giornaliero: ${d.totKcal} kcal`, margin, y); y += 18;
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
     doc.text(`Proteine ${d.totProt} g (${d.pctProt}%)   Carboidrati ${d.totCarb} g (${d.pctCarb}%)   Grassi ${d.totFat} g (${d.pctFat}%)   Fibre ${d.totFib} g`, margin, y); y += 14;
-    doc.text(`Proteine/kg corporeo: ${d.protPerKg} g/kg`, margin, y); y += 10;
+    doc.text(`Proteine/kg corporeo: ${d.protPerKg} g/kg`, margin, y); y += 16;
 
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    d.groups.forEach(g => {
+      if(y > pageHeight - 90){ doc.addPage(); y = margin; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text(g.meal, margin, y); y += 8;
+
+      doc.autoTable({
+        startY: y + 4,
+        head: [['Alimento','g','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
+        body: g.rows.map(r => [r.nome, r.grammi, r.kcal, r.proteine, r.carbo, r.grassi, r.fibre]),
+        foot: [['Totale',' ', g.subKcal, g.subProt, g.subCarb, g.subFat, g.subFib]],
+        styles:{ font:'helvetica', fontSize:9, cellPadding:4 },
+        headStyles:{ fillColor:[27,33,29] },
+        footStyles:{ fillColor:[220,230,221], textColor:[27,33,29], fontStyle:'bold' },
+        margin:{ left: margin, right: margin }
+      });
+
+      y = doc.lastAutoTable.finalY + 20;
+    });
+
+    if(y > pageHeight - 90){ doc.addPage(); y = margin; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Totale di fine giornata', margin, y); y += 8;
     doc.autoTable({
-      startY: y + 10,
-      head: [['Alimento','Pasto','g','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
-      body: d.rows.map(r => [r.nome, r.pasto, r.grammi, r.kcal, r.proteine, r.carbo, r.grassi, r.fibre]),
-      foot: [['Totale','','', d.totKcal, d.totProt, d.totCarb, d.totFat, d.totFib]],
-      styles:{ font:'helvetica', fontSize:9, cellPadding:4 },
+      startY: y + 4,
+      head: [['','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
+      body: [['Totale giornaliero', d.totKcal, d.totProt, d.totCarb, d.totFat, d.totFib]],
+      styles:{ font:'helvetica', fontSize:9.5, cellPadding:5, fontStyle:'bold' },
       headStyles:{ fillColor:[27,33,29] },
-      footStyles:{ fillColor:[220,230,221], textColor:[27,33,29], fontStyle:'bold' },
+      bodyStyles:{ fillColor:[220,230,221], textColor:[27,33,29] },
       margin:{ left: margin, right: margin }
     });
 
     let y2 = doc.lastAutoTable.finalY + 24;
-    if(y2 > 720){ doc.addPage(); y2 = margin; }
+    if(y2 > pageHeight - 80){ doc.addPage(); y2 = margin; }
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
     doc.text('Micronutrienti - totale giornaliero', margin, y2); y2 += 6;
 
@@ -532,7 +565,6 @@ async function exportToPdf(){
 
     if(d.notes){
       let y3 = doc.lastAutoTable.finalY + 24;
-      const pageHeight = doc.internal.pageSize.getHeight();
       if(y3 > pageHeight - 80){ doc.addPage(); y3 = margin; }
       doc.setFont('helvetica','bold'); doc.setFontSize(12);
       doc.text('Consigli Nutrizionali', margin, y3); y3 += 16;
@@ -570,12 +602,21 @@ function exportToWord(){
   try{
     const d = buildExportData();
 
-    const rowsHtml = d.rows.map(r => `
-      <tr>
-        <td>${escapeHtml(r.nome)}</td><td>${escapeHtml(r.pasto)}</td><td align="right">${r.grammi}</td><td align="right">${r.kcal}</td>
-        <td align="right">${r.proteine}</td><td align="right">${r.carbo}</td>
-        <td align="right">${r.grassi}</td><td align="right">${r.fibre}</td>
-      </tr>`).join('');
+    const groupsHtml = d.groups.map(g => {
+      const groupRowsHtml = g.rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.nome)}</td><td align="right">${r.grammi}</td><td align="right">${r.kcal}</td>
+          <td align="right">${r.proteine}</td><td align="right">${r.carbo}</td>
+          <td align="right">${r.grassi}</td><td align="right">${r.fibre}</td>
+        </tr>`).join('');
+      return `
+  <h2>${escapeHtml(g.meal)}</h2>
+  <table>
+    <thead><tr><th>Alimento</th><th>g</th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
+    <tbody>${groupRowsHtml}</tbody>
+    <tfoot><tr><td>Totale</td><td></td><td>${g.subKcal}</td><td>${g.subProt}</td><td>${g.subCarb}</td><td>${g.subFat}</td><td>${g.subFib}</td></tr></tfoot>
+  </table>`;
+    }).join('');
 
     const microHtml = d.micro.map(m => `<tr><td>${m.label}</td><td align="right">${m.value}</td></tr>`).join('');
 
@@ -604,10 +645,12 @@ function exportToWord(){
   </div>
 
   <h2>Alimenti</h2>
+  ${groupsHtml}
+
+  <h2>Totale di fine giornata</h2>
   <table>
-    <thead><tr><th>Alimento</th><th>Pasto</th><th>g</th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
-    <tbody>${rowsHtml}</tbody>
-    <tfoot><tr><td>Totale</td><td></td><td></td><td>${d.totKcal}</td><td>${d.totProt}</td><td>${d.totCarb}</td><td>${d.totFat}</td><td>${d.totFib}</td></tr></tfoot>
+    <thead><tr><th></th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
+    <tbody><tr><td><b>Totale giornaliero</b></td><td align="right"><b>${d.totKcal}</b></td><td align="right"><b>${d.totProt}</b></td><td align="right"><b>${d.totCarb}</b></td><td align="right"><b>${d.totFat}</b></td><td align="right"><b>${d.totFib}</b></td></tr></tbody>
   </table>
 
   <h2>Micronutrienti - totale giornaliero</h2>

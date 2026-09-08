@@ -281,9 +281,54 @@
   </footer>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <script>
+function loadScript(url){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Impossibile caricare '+url));
+    document.head.appendChild(s);
+  });
+}
+
+let jspdfReadyPromise = null;
+function ensureJsPDF(){
+  if(jspdfReadyPromise) return jspdfReadyPromise;
+  jspdfReadyPromise = (async () => {
+    const jspdfUrls = [
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
+      'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
+      'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js'
+    ];
+    const autotableUrls = [
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js',
+      'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',
+      'https://unpkg.com/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js'
+    ];
+
+    if(!window.jspdf){
+      let ok = false;
+      for(const url of jspdfUrls){
+        try{ await loadScript(url); if(window.jspdf){ ok = true; break; } }
+        catch(e){ /* prova il prossimo CDN */ }
+      }
+      if(!ok) throw new Error('Non è stato possibile caricare la libreria PDF (jsPDF). Controlla la connessione a internet.');
+    }
+
+    const hasAutoTable = window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && typeof window.jspdf.jsPDF.API.autoTable === 'function';
+    if(!hasAutoTable){
+      let ok = false;
+      for(const url of autotableUrls){
+        try{ await loadScript(url); ok = true; break; }
+        catch(e){ /* prova il prossimo CDN */ }
+      }
+      if(!ok) throw new Error('Non è stato possibile caricare il modulo tabelle PDF (autoTable). Controlla la connessione a internet.');
+    }
+  })();
+  return jspdfReadyPromise;
+}
+
 const NUTRIENTS = [
   {key:'calcio', label:'Calcio', unit:'mg'},
   {key:'ferro', label:'Ferro', unit:'mg'},
@@ -409,11 +454,19 @@ function buildExportData(){
   };
 }
 
-function exportToPdf(){
+async function exportToPdf(){
   const btn = document.getElementById('exportPdf');
-  if(!window.jspdf){ alert('Libreria PDF non ancora caricata, riprova tra un istante.'); return; }
   btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Preparazione…';
   try{
+    try{
+      await ensureJsPDF();
+    }catch(loadErr){
+      alert(loadErr.message || 'Impossibile caricare la libreria PDF. Controlla la connessione a internet e riprova.');
+      return;
+    }
+
     const d = buildExportData();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({unit:'pt', format:'a4'});
@@ -463,8 +516,12 @@ function exportToPdf(){
     });
 
     doc.save(`dieta_${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch(genErr){
+    console.error(genErr);
+    alert('Si è verificato un errore nella generazione del PDF: ' + genErr.message);
   } finally {
     btn.disabled = false;
+    btn.textContent = originalLabel;
   }
 }
 

@@ -120,6 +120,7 @@
   .food-row{border-bottom:1px solid var(--rule); padding:13px 0;}
   .food-row .row-top{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
   .food-row select.food-select{flex:1 1 170px; min-width:140px;}
+  .food-row select.meal-select{flex:1 1 150px; min-width:130px;}
   .field{display:flex; flex-direction:column; gap:2px;}
   .field label{font-size:10px; color:var(--ink-soft);}
   .field input{width:76px;}
@@ -269,6 +270,11 @@
   <div class="rows" id="rows"></div>
   <button class="add-row" id="addRow" type="button">+ Aggiungi alimento</button>
 
+  <p class="section-label">CONSIGLI NUTRIZIONALI</p>
+  <div class="converter">
+    <textarea id="notesInput" rows="4" placeholder="Note e consigli per il paziente (es. indicazioni su idratazione, timing dei pasti, integrazione...)" style="width:100%; font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--ink); border:1px solid var(--rule); background:#fff; padding:9px; resize:vertical;"></textarea>
+  </div>
+
   <p class="section-label">MICRONUTRIENTI</p>
   <details class="micro-summary">
     <summary>Dettaglio totale giornaliero</summary>
@@ -343,9 +349,11 @@ const NUTRIENTS = [
   {key:'vitA', label:'Vit. A', unit:'µg'},
 ];
 
+const MEALS = ['Colazione','Spuntino (Mattino)','Pranzo','Merenda (Pomeriggio)','Cena'];
+
 let FOODS = [];
 let foodByName = {};
-let state = {bodyWeight: 85, rows: []};
+let state = {bodyWeight: 85, rows: [], notes: ''};
 
 const STORAGE_KEY = 'dietaApp.v1';
 
@@ -372,7 +380,7 @@ function saveState(){
 function uid(){ return 'r'+Math.random().toString(36).slice(2,9); }
 
 function defaultRow(foodName){
-  return {id: uid(), food: foodName, grams: 100, kcalDesired: ''};
+  return {id: uid(), food: foodName, grams: 100, kcalDesired: '', pasto: MEALS[0]};
 }
 
 async function init(){
@@ -391,12 +399,17 @@ async function init(){
   }
 
   document.getElementById('bodyWeight').value = state.bodyWeight;
+  document.getElementById('notesInput').value = state.notes || '';
   buildFoodOptions();
   render();
 
   document.getElementById('bodyWeight').addEventListener('input', e=>{
     state.bodyWeight = parseFloat(e.target.value) || 0;
     saveState(); render();
+  });
+  document.getElementById('notesInput').addEventListener('input', e=>{
+    state.notes = e.target.value;
+    saveState();
   });
   document.getElementById('addRow').addEventListener('click', ()=>{
     state.rows.push(defaultRow(FOODS[0].nome));
@@ -429,6 +442,7 @@ function buildExportData(){
     const {food, out} = computeRow(row);
     return {
       nome: food.nome,
+      pasto: row.pasto || MEALS[0],
       grammi: fmt(parseFloat(row.grams) || 0, 0),
       kcal: fmt(out.kcal, 0),
       proteine: fmt(out.proteine),
@@ -447,6 +461,7 @@ function buildExportData(){
 
   return {
     dataStr, bw, rows, micro,
+    notes: (state.notes || '').trim(),
     totKcal: fmt(totals.kcal, 0),
     totProt: fmt(totals.proteine), totCarb: fmt(totals.carbo), totFat: fmt(totals.grassi), totFib: fmt(totals.fibre),
     pctProt: fmt(kcalP/base*100, 0), pctCarb: fmt(kcalC/base*100, 0), pctFat: fmt(kcalF/base*100, 0),
@@ -486,9 +501,9 @@ async function exportToPdf(){
 
     doc.autoTable({
       startY: y + 10,
-      head: [['Alimento','g','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
-      body: d.rows.map(r => [r.nome, r.grammi, r.kcal, r.proteine, r.carbo, r.grassi, r.fibre]),
-      foot: [['Totale','', d.totKcal, d.totProt, d.totCarb, d.totFat, d.totFib]],
+      head: [['Alimento','Pasto','g','kcal','Proteine g','Carbo g','Grassi g','Fibre g']],
+      body: d.rows.map(r => [r.nome, r.pasto, r.grammi, r.kcal, r.proteine, r.carbo, r.grassi, r.fibre]),
+      foot: [['Totale','','', d.totKcal, d.totProt, d.totCarb, d.totFat, d.totFib]],
       styles:{ font:'helvetica', fontSize:9, cellPadding:4 },
       headStyles:{ fillColor:[27,33,29] },
       footStyles:{ fillColor:[220,230,221], textColor:[27,33,29], fontStyle:'bold' },
@@ -515,6 +530,22 @@ async function exportToPdf(){
       margin:{ left: margin, right: margin }
     });
 
+    if(d.notes){
+      let y3 = doc.lastAutoTable.finalY + 24;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      if(y3 > pageHeight - 80){ doc.addPage(); y3 = margin; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text('Consigli Nutrizionali', margin, y3); y3 += 16;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      const maxWidth = doc.internal.pageSize.getWidth() - margin*2;
+      const lines = doc.splitTextToSize(d.notes, maxWidth);
+      lines.forEach(line => {
+        if(y3 > pageHeight - margin){ doc.addPage(); y3 = margin; }
+        doc.text(line, margin, y3);
+        y3 += 13;
+      });
+    }
+
     doc.save(`dieta_${new Date().toISOString().slice(0,10)}.pdf`);
   } catch(genErr){
     console.error(genErr);
@@ -525,6 +556,14 @@ async function exportToPdf(){
   }
 }
 
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
 function exportToWord(){
   const btn = document.getElementById('exportWord');
   btn.disabled = true;
@@ -533,7 +572,7 @@ function exportToWord(){
 
     const rowsHtml = d.rows.map(r => `
       <tr>
-        <td>${r.nome}</td><td align="right">${r.grammi}</td><td align="right">${r.kcal}</td>
+        <td>${escapeHtml(r.nome)}</td><td>${escapeHtml(r.pasto)}</td><td align="right">${r.grammi}</td><td align="right">${r.kcal}</td>
         <td align="right">${r.proteine}</td><td align="right">${r.carbo}</td>
         <td align="right">${r.grassi}</td><td align="right">${r.fibre}</td>
       </tr>`).join('');
@@ -566,15 +605,17 @@ function exportToWord(){
 
   <h2>Alimenti</h2>
   <table>
-    <thead><tr><th>Alimento</th><th>g</th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
+    <thead><tr><th>Alimento</th><th>Pasto</th><th>g</th><th>kcal</th><th>Proteine g</th><th>Carbo g</th><th>Grassi g</th><th>Fibre g</th></tr></thead>
     <tbody>${rowsHtml}</tbody>
-    <tfoot><tr><td>Totale</td><td></td><td>${d.totKcal}</td><td>${d.totProt}</td><td>${d.totCarb}</td><td>${d.totFat}</td><td>${d.totFib}</td></tr></tfoot>
+    <tfoot><tr><td>Totale</td><td></td><td></td><td>${d.totKcal}</td><td>${d.totProt}</td><td>${d.totCarb}</td><td>${d.totFat}</td><td>${d.totFib}</td></tr></tfoot>
   </table>
 
   <h2>Micronutrienti - totale giornaliero</h2>
   <table>
     <tbody>${microHtml}</tbody>
   </table>
+
+  ${d.notes ? `<h2>Consigli Nutrizionali</h2><p style="white-space:pre-wrap;">${escapeHtml(d.notes)}</p>` : ''}
 </body>
 </html>`;
 
@@ -598,6 +639,10 @@ function optionsHtml(selected){
 
 function buildFoodOptions(){
   document.getElementById('convFood').innerHTML = optionsHtml(FOODS[0].nome);
+}
+
+function mealOptionsHtml(selected){
+  return MEALS.map(m => `<option value="${m}" ${m===selected?'selected':''}>${m}</option>`).join('');
 }
 
 function computeRow(row){
@@ -636,6 +681,7 @@ function renderRows(){
     el.innerHTML = `
       <div class="row-top">
         <select class="food-select" data-id="${row.id}" data-field="food">${optionsHtml(row.food)}</select>
+        <select class="meal-select" data-id="${row.id}" data-field="pasto">${mealOptionsHtml(row.pasto)}</select>
         <div class="field">
           <label>grammi</label>
           <input type="number" min="0" step="1" value="${row.grams}" data-id="${row.id}" data-field="grams">
@@ -648,14 +694,14 @@ function renderRows(){
           <button class="icon-btn" data-id="${row.id}" data-action="remove" title="Elimina">✕</button>
         </div>
       </div>
-      ${suggestion ? `<div class="hint">→ ${fmt(suggestion.grams)} g suggeriti per raggiungere le kcal desiderate (proteine: ${fmt(suggestion.proteine)} g)
-        <button data-id="${row.id}" data-action="applySuggestion" data-grams="${suggestion.grams.toFixed(1)}">usa questo valore</button></div>` : ''}
+      <div class="hint" id="hint-${row.id}" style="${suggestion ? '' : 'display:none;'}">${suggestion ? `→ ${fmt(suggestion.grams)} g suggeriti per raggiungere le kcal desiderate (proteine: ${fmt(suggestion.proteine)} g)
+        <button data-id="${row.id}" data-action="applySuggestion" data-grams="${suggestion.grams.toFixed(1)}">usa questo valore</button>` : ''}</div>
       <div class="row-results">
-        <div class="r-item"><b>${fmt(out.kcal,0)}</b><span>kcal</span></div>
-        <div class="r-item"><b>${fmt(out.proteine)}</b><span>proteine g</span></div>
-        <div class="r-item"><b>${fmt(out.carbo)}</b><span>carbo g</span></div>
-        <div class="r-item"><b>${fmt(out.grassi)}</b><span>grassi g</span></div>
-        <div class="r-item"><b>${fmt(out.fibre)}</b><span>fibre g</span></div>
+        <div class="r-item"><b id="res-kcal-${row.id}">${fmt(out.kcal,0)}</b><span>kcal</span></div>
+        <div class="r-item"><b id="res-prot-${row.id}">${fmt(out.proteine)}</b><span>proteine g</span></div>
+        <div class="r-item"><b id="res-carb-${row.id}">${fmt(out.carbo)}</b><span>carbo g</span></div>
+        <div class="r-item"><b id="res-fat-${row.id}">${fmt(out.grassi)}</b><span>grassi g</span></div>
+        <div class="r-item"><b id="res-fib-${row.id}">${fmt(out.fibre)}</b><span>fibre g</span></div>
       </div>
       <button class="micro-toggle" data-action="toggleMicro" data-id="${row.id}">micronutrienti</button>
       <div class="micro-table" id="micro-${row.id}">
@@ -680,13 +726,7 @@ function renderRows(){
       document.getElementById('micro-'+btn.dataset.id).classList.toggle('open');
     });
   });
-  container.querySelectorAll('[data-action="applySuggestion"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const row = state.rows.find(r => r.id === btn.dataset.id);
-      row.grams = Math.round(parseFloat(btn.dataset.grams));
-      saveState(); render();
-    });
-  });
+  container.querySelectorAll('[data-action="applySuggestion"]').forEach(bindApplySuggestion);
 }
 
 function onFieldChange(e){
@@ -696,8 +736,55 @@ function onFieldChange(e){
   if(!row) return;
   row[field] = e.target.value;
   saveState();
-  renderRows();
-  renderTotals();
+
+  if(field === 'grams' || field === 'kcalDesired'){
+    // Aggiorna solo i valori calcolati senza ricreare gli input:
+    // ricreare l'intera riga ad ogni carattere digitato toglie il focus
+    // dal campo su mobile, obbligando l'utente a toccarlo di nuovo ad ogni cifra.
+    updateRowOutputs(row);
+    renderTotals();
+  } else {
+    renderRows();
+    renderTotals();
+  }
+}
+
+function bindApplySuggestion(btn){
+  btn.addEventListener('click', () => {
+    const row = state.rows.find(r => r.id === btn.dataset.id);
+    row.grams = Math.round(parseFloat(btn.dataset.grams));
+    saveState(); renderRows(); renderTotals();
+  });
+}
+
+function updateRowOutputs(row){
+  const {out, suggestion} = computeRow(row);
+
+  const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setText('res-kcal-'+row.id, fmt(out.kcal,0));
+  setText('res-prot-'+row.id, fmt(out.proteine));
+  setText('res-carb-'+row.id, fmt(out.carbo));
+  setText('res-fat-'+row.id, fmt(out.grassi));
+  setText('res-fib-'+row.id, fmt(out.fibre));
+
+  const hintEl = document.getElementById('hint-'+row.id);
+  if(hintEl){
+    if(suggestion){
+      hintEl.style.display = '';
+      hintEl.innerHTML = `→ ${fmt(suggestion.grams)} g suggeriti per raggiungere le kcal desiderate (proteine: ${fmt(suggestion.proteine)} g)
+        <button data-id="${row.id}" data-action="applySuggestion" data-grams="${suggestion.grams.toFixed(1)}">usa questo valore</button>`;
+      const applyBtn = hintEl.querySelector('[data-action="applySuggestion"]');
+      if(applyBtn) bindApplySuggestion(applyBtn);
+    } else {
+      hintEl.style.display = 'none';
+      hintEl.innerHTML = '';
+    }
+  }
+
+  const microTable = document.getElementById('micro-'+row.id);
+  if(microTable){
+    microTable.innerHTML = NUTRIENTS.map(n => `<div><span>${n.label}</span><b>${fmt(out[n.key], n.key==='vitB12'?2:1)} ${n.unit}</b></div>`).join('');
+  }
 }
 
 function getTotals(){
